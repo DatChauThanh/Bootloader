@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "BL_Header.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -41,7 +41,13 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-
+extern CAN_HandleTypeDef hcan;
+extern IWDG_HandleTypeDef hiwdg;
+extern CAN_TxHeaderTypeDef TxHeader;
+extern CAN_RxHeaderTypeDef RxHeader;
+extern uint8_t TxData[8];
+extern uint8_t RxData[8];
+extern uint32_t TxMailbox;
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
@@ -59,8 +65,6 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
-#define MODE_Pin GPIO_PIN_0
-#define MODE_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

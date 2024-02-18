@@ -1,5 +1,0 @@
-../Core/Src/bootloader.c:12:6:bootloaderInit	10
-../Core/Src/bootloader.c:64:6:DeInit	1
-../Core/Src/bootloader.c:79:6:JumpToApplicationApp	1
-../Core/Src/bootloader.c:89:6:errorBlink	1
-../Core/Src/bootloader.c:135:10:readData	1
