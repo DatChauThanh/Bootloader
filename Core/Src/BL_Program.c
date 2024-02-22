@@ -157,10 +157,10 @@ void BL_voidCopyImageToBackupRegion(void)
 {
 	FLASH_EraseInitTypeDef Local_eraseInfo;
 	uint32_t Local_u32PageError;
-	uint32_t Local_u32BackupDataAddress = BL_INITIALIZE_WITH_ZERO;
-	uint32_t Local_u32ActiveDataAddress = BL_INITIALIZE_WITH_ZERO;
-	uint32_t Local_u32ActiveDataWord = BL_INITIALIZE_WITH_ZERO;
-	uint32_t Local_u32ActiveSizeInWord = BL_ReadAddressData(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS);
+	uint32_t Local_u32BackupDataAddress 		= BL_INITIALIZE_WITH_ZERO;
+	uint32_t Local_u32ActiveDataAddress 		= BL_INITIALIZE_WITH_ZERO;
+	uint32_t Local_u32ActiveDataWord 			= BL_INITIALIZE_WITH_ZERO;
+	uint32_t Local_u32ActiveSizeInWord 			= BL_ReadAddressData(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS);
 	Local_u32ActiveSizeInWord = Local_u32ActiveSizeInWord / 4;
 
 	// Erase the Backup region.
@@ -239,7 +239,7 @@ void BL_voidUpdateHeaders(void)
 {
 	uint8_t  Local_u8DataArray[8]              = {BL_INITIALIZE_WITH_ZERO};
 	uint32_t Local_u32ActiveRegionStatus       = BL_INITIALIZE_WITH_ZERO;
-	uint32_t Local_u32ImageSizeInWord          = BL_INITIALIZE_WITH_ZERO;
+	uint32_t Local_u32ImageSizeInBytes         = BL_INITIALIZE_WITH_ZERO;
 	uint8_t	 Local_u8HeaderFlag                = BL_INITIALIZE_WITH_ZERO;
 
 	Local_u32ActiveRegionStatus = BL_ReadAddressData(FLAG_STATUS_ACTIVE_REGION_ADDRESS);
@@ -250,9 +250,12 @@ void BL_voidUpdateHeaders(void)
 	TxHeader.StdId = NODE_ID_ONE;  // ID
 	TxHeader.DLC = HEADER_DATA_LENGTH;  // data length
 	TxData[0] = UDS_MCU_ACKNOWLEDGE_UPGRADE_REQUEST;
-
 	HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
-	while(HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, Local_u8DataArray) != HAL_OK){}
+
+	// Wait until FIFO 0 become pending state
+	while(!(hcan.Instance->RF0R & CAN_RF0R_FMP0));
+	HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, Local_u8DataArray);
+
 	Local_u8HeaderFlag = Local_u8DataArray[0];
 
 	if(Local_u8HeaderFlag == UDS_GWY_PROVIDE_HEADER)
@@ -260,20 +263,26 @@ void BL_voidUpdateHeaders(void)
 		TxData[0] = UDS_MCU_ACCEPT_RECEIVING_HEADER;
 		HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
 
-		while(HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, Local_u8DataArray) != HAL_OK){}
-		Local_u32ImageSizeInWord = (Local_u8DataArray[3] << 24) | (Local_u8DataArray[2] << 16) |
-									(Local_u8DataArray[3] << 8) | (Local_u8DataArray[2] << 0);
+		// Wait until FIFO 0 become pending state
+		while(!(hcan.Instance->RF0R & CAN_RF0R_FMP0));
+		HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, Local_u8DataArray);
+
+		Local_u32ImageSizeInBytes = (Local_u8DataArray[3] << SHIFT_24_BIT) | (Local_u8DataArray[2] << SHIFT_16_BIT) |
+									(Local_u8DataArray[1] << SHIFT_8_BIT) | (Local_u8DataArray[0] << SHIFT_0_BIT);
 
 		if(Local_u32ActiveRegionStatus == BR_IMAGE_IS_ACTIVE )
 		{
 			BL_voidCopyImageToBackupRegion();
 		}
-		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS,Local_u32ImageSizeInWord);
+		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_ACTIVE_REGION_ADDRESS,BR_SET_IMAGE_CORRUPTED);
+		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS,Local_u32ImageSizeInBytes);
 	}
 }
 
 void BL_voidReceiveUpdate(void)
 {
+	uint32_t Local_u32HighByteDataReceive  						  = BL_INITIALIZE_WITH_ZERO;
+	uint32_t Local_u32LowByteDataReceive  						  = BL_INITIALIZE_WITH_ZERO;
 	uint8_t  Local_u8RecordCounter                                = BL_RESET_COUNTER_TO_START_NEW_REC ;
 	uint8_t  Local_u8GatewayRequest                               = BL_INITIALIZE_WITH_FALSE;
 	uint32_t Local_u32InactiveImageAddressCounter                 = ACTIVE_IMAGE_START_ADDRESS;
@@ -302,14 +311,79 @@ void BL_voidReceiveUpdate(void)
 	//Loop to receive code update
 	while(Local_u32SizeOfCode)
 	{
-		while(HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK){}
+		// Wait until FIFO 0 become pending state
+		while(!(hcan.Instance->RF0R & CAN_RF0R_FMP0));
+		HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
+
+		//Check UDS ID
 		if(RxData[0] == UDS_GWY_REQUEST_SENDING_LINE_OF_CODE)
 		{
+			TxData[0] = UDS_MCU_ACCEPT_RECEIVING_PACKET_OF_CODE;
+			HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
 
+			if (Local_u32SizeOfCode > 8)
+			{
+				while(!(hcan.Instance->RF0R & CAN_RF0R_FMP0));
+				HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
+
+				Local_u32HighByteDataReceive = (RxData[7] << SHIFT_24_BIT) | (RxData[6] << SHIFT_16_BIT)
+											| (RxData[5] << SHIFT_8_BIT) |(RxData[4] << SHIFT_0_BIT) ;
+				Local_u32LowByteDataReceive  = (RxData[3] << SHIFT_24_BIT) | (RxData[2] << SHIFT_16_BIT)
+											| (RxData[1] << SHIFT_8_BIT) | (RxData[0] << SHIFT_0_BIT) ;
+
+				HAL_FLASH_Unlock(); //Unlocks the flash memory
+				HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Local_u32InactiveImageAddressCounter, Local_u32LowByteDataReceive);
+				HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Local_u32InactiveImageAddressCounter + 4, Local_u32HighByteDataReceive);
+				HAL_FLASH_Lock();  //Locks again the flash memory
+
+				Local_u32InactiveImageAddressCounter += 8;
+				Local_u32SizeOfCode -= 8;
+			}
+			else
+			{
+				while(!(hcan.Instance->RF0R & CAN_RF0R_FMP0));
+				HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
+
+				Local_u32HighByteDataReceive = (RxData[7] << SHIFT_24_BIT) | (RxData[6] << SHIFT_16_BIT)
+											| (RxData[5] << SHIFT_8_BIT) |(RxData[4] << SHIFT_0_BIT) ;
+				Local_u32LowByteDataReceive  = (RxData[3] << SHIFT_24_BIT) | (RxData[2] << SHIFT_16_BIT)
+											| (RxData[1] << SHIFT_8_BIT) | (RxData[0] << SHIFT_0_BIT) ;
+
+				HAL_FLASH_Unlock(); //Unlocks the flash memory
+				HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Local_u32InactiveImageAddressCounter, Local_u32LowByteDataReceive);
+				if(RxHeader.DLC > 4){
+					HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Local_u32InactiveImageAddressCounter + 4, Local_u32HighByteDataReceive);
+				}
+				HAL_FLASH_Lock();  //Locks again the flash memory
+
+				Local_u32SizeOfCode -= Local_u32SizeOfCode ;
+			}
+			TxData[0] = UDS_MCU_ACKNOWLEDGE_LINE_OF_CODE_RECEIVED;
+			HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
 		}
-
-
 	}
+	// Wait for finish code of GW
+	while(!(hcan.Instance->RF0R & CAN_RF0R_FMP0));
+	HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
+	if (RxData[0] == UDS_GWY_ACKNOWLEDGE_FINISHING_SENDING_CODE)
+	{
+		BL_voidFinishBootLoader();
+	}
+}
+
+void BL_voidFinishBootLoader(void)
+{
+	//Structure CAN Transmit
+	TxHeader.IDE = CAN_ID_STD;
+	TxHeader.RTR = CAN_RTR_DATA;
+	TxHeader.StdId = NODE_ID_ONE;  // ID
+	TxHeader.DLC = HEADER_DATA_LENGTH;  // data length
+	TxData[0] = UDS_MCU_ACKNOWLEDGE_FINISHING;
+	HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+
+	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_ACTIVE_REGION_ADDRESS , BR_SET_IMAGE_ACTIVE);
+	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_BOOTLOADER , BL_RESET_BRANCHING_FLAG);
+	BL_voidMakeSoftWareReset();
 }
 
 void BL_voidMakeSoftWareReset(void)

@@ -15,7 +15,7 @@
 //**************************Include***************************//
 
 //*************************Define****************************//
-typedef void (*Application_t)(void);
+
 
 #define BOOTLOADER_IMAGE			(0x08000000)
 #define ACTIVE_IMAGE              	(0x08005000)      // Origin + Bootloader size (20kB)
@@ -108,7 +108,6 @@ typedef void (*Application_t)(void);
 #define UDS_GWY_REQUEST_SENDING_LINE_OF_CODE        0x36
 #define UDS_MCU_ACKNOWLEDGE_LINE_OF_CODE_RECEIVED   0x76
 #define UDS_GWY_ACKNOWLEDGE_FINISHING_SENDING_CODE  0x37
-#define UDS_GWY_ACKNOWLEDGE_FINISHING               0x04
 #define UDS_MCU_ACKNOWLEDGE_FINISHING               0x77
 #define UDS_MCU_ACKNOWLEDGE_ACTIVE_CODE_CORRECT     0x78
 #define UDS_MCU_ACKNOWLEDGE_ACTIVE_CODE_NOT_CORRECT 0x79
@@ -122,11 +121,16 @@ typedef void (*Application_t)(void);
 #define HEADER_DATA_LENGTH 1
 #define RECEIVE_DATA_LENGTH 8
 
+//Shift bit macro
+#define SHIFT_24_BIT	24
+#define SHIFT_16_BIT	16
+#define SHIFT_8_BIT		8
+#define SHIFT_0_BIT		0
 //*************************Define****************************//
 
 //*************************Structure****************************//
+typedef void (*Application_t)(void);
 
-typedef void (application_t)(void);
 
 //*************************Structure****************************//
 
@@ -452,6 +456,32 @@ void BL_voidUpdateHeaders(void);
 *
 *******************************************************************************/
 void BL_voidReceiveUpdate(void);
+
+/******************************************************************************
+* Function :  BL_voidFinishBootLoader(void)
+*//**
+* \b Description:
+*
+* This function is used to finish boot_loader and reset HW then MCU will jump to application
+*
+* PRE-CONDITION:  None
+*
+* POST-CONDITION: None
+*
+* @param [in]    void
+*
+* @return 		 void
+*
+* \b Example Example:
+* @code
+* 	BL_voidFinishBootLoader(void)
+*
+* @endcode
+*
+* @see  BL_voidFinishBootLoader
+*
+*******************************************************************************/
+void BL_voidFinishBootLoader(void);
 
 /******************************************************************************
 * Function :  BL_voidMakeSoftWareReset(void)

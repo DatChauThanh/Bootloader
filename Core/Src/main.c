@@ -95,11 +95,16 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_CAN_Init();
+
+  HAL_CAN_Start(&hcan);
+
+   // Activate the notification
+//HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO1_MSG_PENDING);
   /* USER CODE BEGIN 2 */
   BL_voidBootLoader_Init();
   /* USER CODE END 2 */
-
   /* Infinite loop */
+
   /* USER CODE BEGIN WHILE */
   while (1)
   {
