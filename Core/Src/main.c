@@ -45,6 +45,7 @@ CAN_HandleTypeDef hcan;
 IWDG_HandleTypeDef hiwdg;
 
 /* USER CODE BEGIN PV */
+CAN_FilterTypeDef canfilterconfig;
 CAN_TxHeaderTypeDef TxHeader;
 CAN_RxHeaderTypeDef RxHeader;
 uint8_t TxData[8];
@@ -97,9 +98,6 @@ int main(void)
   MX_CAN_Init();
 
   HAL_CAN_Start(&hcan);
-
-   // Activate the notification
-//HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO1_MSG_PENDING);
   /* USER CODE BEGIN 2 */
   BL_voidBootLoader_Init();
   /* USER CODE END 2 */
@@ -187,7 +185,18 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN_Init 2 */
+  canfilterconfig.FilterActivation = CAN_FILTER_ENABLE;
+  canfilterconfig.FilterBank = 0;  // which filter bank to use from the assigned ones
+  canfilterconfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
+  canfilterconfig.FilterIdHigh = 0x000;
+  canfilterconfig.FilterIdLow = 0;
+  canfilterconfig.FilterMaskIdHigh = 0;
+  canfilterconfig.FilterMaskIdLow = 0;
+  canfilterconfig.FilterMode = CAN_FILTERMODE_IDMASK;
+  canfilterconfig.FilterScale = CAN_FILTERSCALE_32BIT;
+  canfilterconfig.SlaveStartFilterBank = 10;  // how many filters to assign to the CAN1 (master can)
 
+  HAL_CAN_ConfigFilter(&hcan, &canfilterconfig);
   /* USER CODE END CAN_Init 2 */
 
 }
@@ -197,28 +206,28 @@ static void MX_CAN_Init(void)
   * @param None
   * @retval None
   */
-static void MX_IWDG_Init(void)
-{
-
-  /* USER CODE BEGIN IWDG_Init 0 */
-
-  /* USER CODE END IWDG_Init 0 */
-
-  /* USER CODE BEGIN IWDG_Init 1 */
-
-  /* USER CODE END IWDG_Init 1 */
-  hiwdg.Instance = IWDG;
-  hiwdg.Init.Prescaler = IWDG_PRESCALER_4;
-  hiwdg.Init.Reload = 4095;
-  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN IWDG_Init 2 */
-
-  /* USER CODE END IWDG_Init 2 */
-
-}
+//static void MX_IWDG_Init(void)
+//{
+//
+//  /* USER CODE BEGIN IWDG_Init 0 */
+//
+//  /* USER CODE END IWDG_Init 0 */
+//
+//  /* USER CODE BEGIN IWDG_Init 1 */
+//
+//  /* USER CODE END IWDG_Init 1 */
+//  hiwdg.Instance = IWDG;
+//  hiwdg.Init.Prescaler = IWDG_PRESCALER_4;
+//  hiwdg.Init.Reload = 4095;
+//  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+//  {
+//    Error_Handler();
+//  }
+//  /* USER CODE BEGIN IWDG_Init 2 */
+//
+//  /* USER CODE END IWDG_Init 2 */
+//
+//}
 
 /**
   * @brief GPIO Initialization Function

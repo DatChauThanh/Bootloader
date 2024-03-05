@@ -1,10 +1,10 @@
 /*******************************************************************************
  * Title                 :   BL
  * Filename              :   BL_Program.c
- * Author                :   Chau Thanh Dat
+ * Author                :   Chau_Thanh_Dat
  * Origin Date           :   19/1/2024
  * Version               :   1.0.0
- * Compiler              :   GCC
+ * Compiler              :   GCC (STM32CubeIDE)
  * Target                :   STM32F103C8T6
  * Notes                 :   None
  *
@@ -14,15 +14,15 @@
 //**************************Include***************************//
 #include "BL_Header.h"
 //**************************Include***************************//
-static uint32_t BL_ReadAddressData(uint32_t address){
+static uint32_t BL_u32ReadAddressData(uint32_t address){
 	uint32_t Local_u32AddressData = *((volatile uint32_t*)(address));
 	return Local_u32AddressData;
 }
 //**************************Function Define***************************//
 void BL_voidBootLoader_Init(void)
 {
-	// Read Branching Request Update Flag to determine behaviour.
-	uint32_t Local_u32Flag = BL_ReadAddressData(FLAG_STATUS_BOOTLOADER);
+	// Read Branching Request Update Flag.
+	uint32_t Local_u32Flag = BL_u32ReadAddressData(FLAG_STATUS_BOOTLOADER);
 	if(Local_u32Flag  == BL_BRANCHING_FLAG_RESET)
 	{
 		// Check images existence, status (and CRC).
@@ -30,7 +30,7 @@ void BL_voidBootLoader_Init(void)
 	}
 	else if(Local_u32Flag == BL_BRANCHING_FLAG_SET)
 	{
-		// Goto Bootloader to Receive code in the inactive image.
+		// Goto Boot_loader to Receive code in the inactive image.
 	    BL_voidJumpToBootloader();
 	}
 	else
@@ -42,8 +42,8 @@ void BL_voidBootLoader_Init(void)
 void BL_voidCheckActiveRegion(void)
 {
     // Read Images Status To Determine Which Image Will Be Excuted.
-	uint32_t Local_u32ActiveImageStatus = BL_ReadAddressData(FLAG_STATUS_ACTIVE_REGION_ADDRESS);
-	//uint32_t Local_u32ReceivedCRC       = BL_ReadAddressData(FLAG_STATUS_CRC_ACTIVE_REGION_ADDRESS);
+	uint32_t Local_u32ActiveImageStatus = BL_u32ReadAddressData(FLAG_STATUS_ACTIVE_REGION_ADDRESS);
+	//uint32_t Local_u32ReceivedCRC       = BL_u32ReadAddressData(FLAG_STATUS_CRC_ACTIVE_REGION_ADDRESS);
 	uint32_t Local_u32BackupStatus      = BL_INITIALIZE_EITH_CORRUPTED;
 
     // if 
@@ -76,8 +76,8 @@ void BL_voidCheckActiveRegion(void)
 
 uint32_t BL_32CheckBackupRegion(void)
 {
-	uint32_t Local_u32BackupStatus =BL_ReadAddressData(FLAG_STATUS_BACKUP_REGION_ADDRESS);
-	// if
+	uint32_t Local_u32BackupStatus =BL_u32ReadAddressData(FLAG_STATUS_BACKUP_REGION_ADDRESS);
+	// if exist Backup image
 	if(Local_u32BackupStatus == BR_IMAGE_IS_BACKUP)
 	{
 		return BR_IMAGE_IS_CORRECT;
@@ -105,7 +105,7 @@ void BL_voidJumpToActiveRegion(void)
 
 	__DMB(); //ARM says to use a DMB instruction before relocating VTOR *
 	SCB->VTOR = ACTIVE_IMAGE; //We relocate vector table to the sector 1
-	__DSB(); //ARM says to use a DSB instruction just after relocating VTOR */
+	__DSB(); //ARM says to use a DSB instruction just after 	relocating VTOR */
 
 	AddressToCall();
 }
@@ -125,7 +125,7 @@ void BL_voidCopyImageToActiveRegion(void)
 	uint32_t Local_u32BackupDataAddress = BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32ActiveDataAddress = BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32BackUpDataWord 	= BL_INITIALIZE_WITH_ZERO;
-	uint32_t Local_u32BackupSizeInWord 	= BL_ReadAddressData(FLAG_STATUS_SIZE_BACKUP_REGION_ADDRESS);
+	uint32_t Local_u32BackupSizeInWord 	= BL_u32ReadAddressData(FLAG_STATUS_SIZE_BACKUP_REGION_ADDRESS);
 	Local_u32BackupSizeInWord = Local_u32BackupSizeInWord / 4;
 	// Erase the Active region.
 	Local_eraseInfo.TypeErase = FLASH_TYPEERASE_PAGES;
@@ -160,14 +160,14 @@ void BL_voidCopyImageToBackupRegion(void)
 	uint32_t Local_u32BackupDataAddress 		= BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32ActiveDataAddress 		= BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32ActiveDataWord 			= BL_INITIALIZE_WITH_ZERO;
-	uint32_t Local_u32ActiveSizeInWord 			= BL_ReadAddressData(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS);
+	uint32_t Local_u32ActiveSizeInWord 			= BL_u32ReadAddressData(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS);
 	Local_u32ActiveSizeInWord = Local_u32ActiveSizeInWord / 4;
 
 	// Erase the Backup region.
-	Local_eraseInfo.TypeErase = FLASH_TYPEERASE_PAGES;
-	Local_eraseInfo.Banks = FLASH_BANK_1;
+	Local_eraseInfo.TypeErase 	= FLASH_TYPEERASE_PAGES;
+	Local_eraseInfo.Banks 		= FLASH_BANK_1;
 	Local_eraseInfo.PageAddress = BACKUP_IMAGE;
-	Local_eraseInfo.NbPages =	FLASH_BANK_NUMOFPAGE;
+	Local_eraseInfo.NbPages 	= FLASH_BANK_NUMOFPAGE;
 
 	HAL_FLASH_Unlock(); //Unlocks the flash memory
 	HAL_FLASHEx_Erase(&Local_eraseInfo, &Local_u32PageError); //Deletes given sectors
@@ -184,6 +184,7 @@ void BL_voidCopyImageToBackupRegion(void)
 	}
 	HAL_FLASH_Lock();
 
+	// Set
 	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_SIZE_BACKUP_REGION_ADDRESS , Local_u32ActiveSizeInWord*4 );
 	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_ACTIVE_REGION_ADDRESS , BR_SET_IMAGE_ACTIVE);
 	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_BACKUP_REGION_ADDRESS , BR_SET_IMAGE_BACKUP);
@@ -242,7 +243,7 @@ void BL_voidUpdateHeaders(void)
 	uint32_t Local_u32ImageSizeInBytes         = BL_INITIALIZE_WITH_ZERO;
 	uint8_t	 Local_u8HeaderFlag                = BL_INITIALIZE_WITH_ZERO;
 
-	Local_u32ActiveRegionStatus = BL_ReadAddressData(FLAG_STATUS_ACTIVE_REGION_ADDRESS);
+	Local_u32ActiveRegionStatus = BL_u32ReadAddressData(FLAG_STATUS_ACTIVE_REGION_ADDRESS);
 
 	//Structure CAN Transmit
 	TxHeader.IDE = CAN_ID_STD;
@@ -283,10 +284,8 @@ void BL_voidReceiveUpdate(void)
 {
 	uint32_t Local_u32HighByteDataReceive  						  = BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32LowByteDataReceive  						  = BL_INITIALIZE_WITH_ZERO;
-	uint8_t  Local_u8RecordCounter                                = BL_RESET_COUNTER_TO_START_NEW_REC ;
-	uint8_t  Local_u8GatewayRequest                               = BL_INITIALIZE_WITH_FALSE;
 	uint32_t Local_u32InactiveImageAddressCounter                 = ACTIVE_IMAGE_START_ADDRESS;
-	uint32_t Local_u32SizeOfCode 								  = BL_ReadAddressData(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS);
+	uint32_t Local_u32SizeOfCode 								  = BL_u32ReadAddressData(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS);
 
 	FLASH_EraseInitTypeDef Local_eraseInfo;
 	uint32_t Local_u32PageError;
@@ -345,7 +344,7 @@ void BL_voidReceiveUpdate(void)
 				HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
 
 				Local_u32HighByteDataReceive = (RxData[7] << SHIFT_24_BIT) | (RxData[6] << SHIFT_16_BIT)
-											| (RxData[5] << SHIFT_8_BIT) |(RxData[4] << SHIFT_0_BIT) ;
+											| (RxData[5] << SHIFT_8_BIT) | (RxData[4] << SHIFT_0_BIT) ;
 				Local_u32LowByteDataReceive  = (RxData[3] << SHIFT_24_BIT) | (RxData[2] << SHIFT_16_BIT)
 											| (RxData[1] << SHIFT_8_BIT) | (RxData[0] << SHIFT_0_BIT) ;
 
@@ -400,33 +399,5 @@ void BL_voidMakeSoftWareReset(void)
 		Error_Handler();
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //**************************Function Define***************************//

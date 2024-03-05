@@ -48,7 +48,7 @@
 #define ERASED_VALUE                          0xffffffff
 
 #define FLAG_STATUS_BOOTLOADER                (START_OF_FLAG_REGION)
-#define FLAG_IMAGE					FLAG_STATUS_BOOTLOADER
+#define FLAG_IMAGE							   FLAG_STATUS_BOOTLOADER
 
 #define FLAG_STATUS_ID_ADDRESS                                   (0x0801FC10)
 #define FLAG_STATUS_ACTIVE_REGION_ADDRESS                        (0x0801FC14)
@@ -167,7 +167,7 @@ typedef void (*Application_t)(void);
 * @see BL_ReadAddressData(uint32_t address)
 *
 *******************************************************************************/
-static uint32_t BL_ReadAddressData(uint32_t address);
+static uint32_t BL_u32ReadAddressData(uint32_t address);
 
 /******************************************************************************
 * Function : BL_voidBootLoader_Init()
