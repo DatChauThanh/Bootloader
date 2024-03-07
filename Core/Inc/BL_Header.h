@@ -20,11 +20,11 @@
 #define BOOTLOADER_IMAGE			(0x08000000)
 #define ACTIVE_IMAGE              	(0x08005000)      // Origin + Bootloader size (20kB)
 #define ACTIVE_IMAGE_START_ADDRESS	ACTIVE_IMAGE
-#define BACKUP_IMAGE              	(0x0800A800)      // Origin + Bootloader size (20kB) + App1 Bank (22kB)
+#define BACKUP_IMAGE              	(0x0800A800)      // Origin + Bootloader size (20kB) + Active Bank (22kB)
 #define BACKUP_IMAGE_START_ADDRESS	BACKUP_IMAGE
 #define FLASH_BANK_SIZE         	(0X5800)          // 22kB
 #define FLASH_PAGE_SIZE_USER    	(0x400)           // 1kB
-#define FLASH_BANK_NUMOFPAGE         	(22)          	  // 22 Page
+#define FLASH_BANK_NUMOFPAGE        (22)          	  // 22 Page
 
 
 #define FIRST_PAGE_NUMBER_IN_ACTIVE_IMAGE_REGION    16
@@ -32,7 +32,7 @@
 
 #define FIRST_PAGE_NUMBER_IN_BACKUP_IMAGE_REGION    38
 #define LAST_PAGE_NUMBER_IN_BACKUP_IMAGE_REGION     59
-#define SIZE_IN_WORD_PER_BANK		  5623		//word = 4 byte // page = 256 word => bank = page * 256 = 22*256
+#define SIZE_IN_WORD_PER_BANK		 	5623		//word = 4 byte // page = 256 word => bank = page * 256 = 22*256
 
 
 //Vector Table Reg 
@@ -115,8 +115,8 @@
 #define UDS_MCU_ACKNOWLEDGE_BACKUP_CODE_NOT_CORRECT 0x7B
 
 //Node ID define
-#define NODE_ID_ONE 0x101
-#define NODE_ID_TWO 0x102
+#define NODE_ID_ONE 0x10
+#define NODE_ID_TWO 0x20
 
 #define HEADER_DATA_LENGTH 1
 #define RECEIVE_DATA_LENGTH 8
@@ -130,8 +130,6 @@
 
 //*************************Structure****************************//
 typedef void (*Application_t)(void);
-
-
 //*************************Structure****************************//
 
 

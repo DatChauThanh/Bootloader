@@ -101,11 +101,13 @@ int main(void)
   /* USER CODE BEGIN 2 */
   BL_voidBootLoader_Init();
   /* USER CODE END 2 */
-  /* Infinite loop */
+
 
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  /* Dead loop */
+	  /* Never go there except error*/
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -274,6 +276,7 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+
   }
   /* USER CODE END Error_Handler_Debug */
 }
