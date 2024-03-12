@@ -268,6 +268,7 @@ void BL_voidUpdateHeaders(void)
 
 		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_ACTIVE_REGION_ADDRESS,BR_SET_IMAGE_CORRUPTED);
 		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS,Local_u32ImageSizeInBytes);
+		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_BOOTLOADER,BL_RESET_BRANCHING_FLAG);
 	}
 }
 
