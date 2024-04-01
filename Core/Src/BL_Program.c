@@ -10,10 +10,13 @@
  *
  *****************************************************************************/
 
-#define Debug
 //**************************Include***************************//
 #include "BL_Header.h"
 #include "Can_Interface.h"
+#include "aes.h"
+
+uint8_t AES_CBC_128_Key[] = { 0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c };
+uint8_t AES_CBC_128_IV[]  = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
 //**************************Include***************************//
 static uint32_t BL_u32ReadAddressData(uint32_t address){
 	uint32_t Local_u32AddressData = *((volatile uint32_t*)(address));
@@ -24,6 +27,7 @@ void BL_voidBootLoader_Init(void)
 {
 	// Read Branching Request Update Flag.
 	uint32_t Local_u32Flag = BL_u32ReadAddressData(FLAG_STATUS_BOOTLOADER);
+
 	if(Local_u32Flag == BL_BRANCHING_FLAG_RESET)
 	{
 		// Check images existence, status (and CRC).
@@ -44,13 +48,25 @@ void BL_voidCheckActiveRegion(void)
 {
     // Read Images Status To Determine Which Image Will Be Excuted.
 	uint32_t Local_u32ActiveImageStatus = BL_u32ReadAddressData(FLAG_STATUS_ACTIVE_REGION_ADDRESS);
-	//uint32_t Local_u32ReceivedCRC       = BL_u32ReadAddressData(FLAG_STATUS_CRC_ACTIVE_REGION_ADDRESS);
 	uint32_t Local_u32BackupStatus      = BL_INITIALIZE_EITH_CORRUPTED;
-
-    // if 
+	uint32_t* Local_u32ActiveImagePointer = (uint32_t*)ACTIVE_IMAGE;
+	uint32_t Local_u32SizeCode = BL_u32ReadAddressData(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS);
+	uint32_t Local_u32CRC =  BL_u32ReadAddressData(FLAG_STATUS_CRC_ACTIVE_REGION_ADDRESS);
+	uint32_t Local_u32CRC_check = HAL_CRC_Calculate(&hcrc, Local_u32ActiveImagePointer, Local_u32SizeCode/4);
+    // Check Active region Image Status.
     if(Local_u32ActiveImageStatus == BR_IMAGE_IS_ACTIVE)
 	{
-		BL_voidJumpToActiveRegion();
+    	// Active Case. Check CRC
+    	if(Local_u32CRC_check == Local_u32CRC){
+    		// CRC is correct.
+    		BL_voidJumpToActiveRegion();
+    	}
+    	else{
+    		// Make Image in the active region Corrupted As it's CRC is Wrong.
+    		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_ACTIVE_REGION_ADDRESS, BR_SET_IMAGE_CORRUPTED);
+    		// Make Software Reset to return to branch code.
+    		BL_voidMakeSoftWareReset();
+    	}
 	}
     else if(Local_u32ActiveImageStatus == BR_IMAGE_IS_CORRUPTED || Local_u32ActiveImageStatus == BR_IMAGE_IS_NOT_EXISTING)
 	{
@@ -78,20 +94,24 @@ void BL_voidCheckActiveRegion(void)
 uint32_t BL_32CheckBackupRegion(void)
 {
 	uint32_t Local_u32BackupStatus =BL_u32ReadAddressData(FLAG_STATUS_BACKUP_REGION_ADDRESS);
+	uint32_t* Local_u32BackupImagePointer = (uint32_t*)BACKUP_IMAGE;
+	uint32_t Local_u32SizeCode = BL_u32ReadAddressData(FLAG_STATUS_SIZE_BACKUP_REGION_ADDRESS);
+	uint32_t Local_u32CRC_Backup =  BL_u32ReadAddressData(FLAG_STATUS_CRC_BACKUP_REGION_ADDRESS);
+	uint32_t Local_u32CRC_Check_Backup = HAL_CRC_Calculate(&hcrc, Local_u32BackupImagePointer, Local_u32SizeCode/4);
 	// if exist Backup image
 	if(Local_u32BackupStatus == BR_IMAGE_IS_BACKUP)
 	{
-		return BR_IMAGE_IS_CORRECT;
+		if (Local_u32CRC_Check_Backup == Local_u32CRC_Backup){
+			return BR_IMAGE_IS_CORRECT;
+		}
+		else{
+			// Handle error
+			// Make Image in the backup region Corrupted As it's CRC is Wrong.
+			BL_voidEraseRestoreHeaderPage(FLAG_STATUS_BACKUP_REGION_ADDRESS, BR_SET_IMAGE_CORRUPTED);
+			// Make Software Reset to return to branch code.
+			return BR_IMAGE_IS_CORRUPTED;
+		}
 	}
-	else if(Local_u32BackupStatus == BR_IMAGE_IS_CORRUPTED || Local_u32BackupStatus == BR_IMAGE_IS_NOT_EXISTING)
-	{
-		return BR_IMAGE_IS_CORRUPTED;
-	}
-	else
-	{
-		//Do nothing here
-	}
-	return Local_u32BackupStatus;
 }
 
 void BL_voidJumpToActiveRegion(void)
@@ -106,7 +126,7 @@ void BL_voidJumpToActiveRegion(void)
 
 	__DMB(); //ARM says to use a DMB instruction before relocating VTOR *
 	SCB->VTOR = ACTIVE_IMAGE; //We relocate vector table to the sector 1
-	__DSB(); //ARM says to use a DSB instruction just after 	relocating VTOR */
+	__DSB(); //ARM says to use a DSB instruction just after relocating VTOR */
 
 	AddressToCall();
 }
@@ -116,7 +136,6 @@ void BL_voidJumpToBootloader(void)
 	//@TODO: In develop
 	BL_voidUpdateHeaders();
 	BL_voidReceiveUpdate();
-
 }
 
 void BL_voidCopyImageToActiveRegion(void)
@@ -127,7 +146,10 @@ void BL_voidCopyImageToActiveRegion(void)
 	uint32_t Local_u32ActiveDataAddress = BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32BackUpDataWord 	= BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32BackupSizeInWord 	= BL_u32ReadAddressData(FLAG_STATUS_SIZE_BACKUP_REGION_ADDRESS);
+	uint32_t* Local_u32BackupImagePointer = (uint32_t*)BACKUP_IMAGE;
 	Local_u32BackupSizeInWord = Local_u32BackupSizeInWord / 4;
+	uint32_t Local_u32CRC = HAL_CRC_Calculate(&hcrc, Local_u32BackupImagePointer, Local_u32BackupSizeInWord);
+
 	// Erase the Active region.
 	Local_eraseInfo.TypeErase = FLASH_TYPEERASE_PAGES;
 	Local_eraseInfo.Banks = FLASH_BANK_1;
@@ -150,6 +172,7 @@ void BL_voidCopyImageToActiveRegion(void)
 	HAL_FLASH_Lock();
 
 	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS , Local_u32BackupSizeInWord*4);
+	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_CRC_ACTIVE_REGION_ADDRESS , Local_u32CRC);
 	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_ACTIVE_REGION_ADDRESS , BR_SET_IMAGE_ACTIVE );
 	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_BACKUP_REGION_ADDRESS , BR_SET_IMAGE_BACKUP);
 }
@@ -162,7 +185,9 @@ void BL_voidCopyImageToBackupRegion(void)
 	uint32_t Local_u32ActiveDataAddress 		= BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32ActiveDataWord 			= BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32ActiveSizeInWord 			= BL_u32ReadAddressData(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS);
+	uint32_t* Local_u32ActiveImagePointer = (uint32_t*)ACTIVE_IMAGE;
 	Local_u32ActiveSizeInWord = Local_u32ActiveSizeInWord / 4;
+	uint32_t Local_u32CRC = HAL_CRC_Calculate(&hcrc, Local_u32ActiveImagePointer, Local_u32ActiveSizeInWord);
 
 	// Erase the Backup region.
 	Local_eraseInfo.TypeErase 	= FLASH_TYPEERASE_PAGES;
@@ -187,6 +212,7 @@ void BL_voidCopyImageToBackupRegion(void)
 
 	// Set
 	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_SIZE_BACKUP_REGION_ADDRESS , Local_u32ActiveSizeInWord*4 );
+	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_CRC_BACKUP_REGION_ADDRESS , Local_u32CRC);
 	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_ACTIVE_REGION_ADDRESS , BR_SET_IMAGE_ACTIVE);
 	BL_voidEraseRestoreHeaderPage(FLAG_STATUS_BACKUP_REGION_ADDRESS , BR_SET_IMAGE_BACKUP);
 }
@@ -206,7 +232,7 @@ void BL_voidEraseRestoreHeaderPage(uint32_t Copy_u32Address, uint32_t Copy_u32Ne
 		{
 			Local_u32AddressArray[Local_u16DataIndex] = Local_u32AddressCounter;
 			Local_u32DataArray[Local_u16DataIndex] = *((volatile uint32_t*)(Local_u32AddressCounter));
-			Local_u16DataIndex++ ;
+			Local_u16DataIndex++;
 		}
 		Local_u32AddressCounter = Local_u32AddressCounter + WORD_SIZE_IN_BYTE;
 	}
@@ -242,6 +268,7 @@ void BL_voidUpdateHeaders(void)
 	uint8_t  Local_u8DataArray[8]              = {BL_INITIALIZE_WITH_ZERO};
 	uint32_t Local_u32ActiveRegionStatus       = BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32ImageSizeInBytes         = BL_INITIALIZE_WITH_ZERO;
+	uint32_t Local_u32CRC_Value			       = BL_INITIALIZE_WITH_ZERO;
 	uint8_t	 Local_u8HeaderFlag                = BL_INITIALIZE_WITH_ZERO;
 
 	Local_u32ActiveRegionStatus = BL_u32ReadAddressData(FLAG_STATUS_ACTIVE_REGION_ADDRESS);
@@ -260,6 +287,8 @@ void BL_voidUpdateHeaders(void)
 
 		Local_u32ImageSizeInBytes = (Local_u8DataArray[3] << SHIFT_24_BIT) | (Local_u8DataArray[2] << SHIFT_16_BIT) | 		\
 									(Local_u8DataArray[1] << SHIFT_8_BIT) | (Local_u8DataArray[0] << SHIFT_0_BIT);
+		Local_u32CRC_Value		  = (Local_u8DataArray[7] << SHIFT_24_BIT) | (Local_u8DataArray[6] << SHIFT_16_BIT) | 		\
+									(Local_u8DataArray[5] << SHIFT_8_BIT) | (Local_u8DataArray[4] << SHIFT_0_BIT);
 
 		if(Local_u32ActiveRegionStatus == BR_IMAGE_IS_ACTIVE )
 		{
@@ -268,18 +297,21 @@ void BL_voidUpdateHeaders(void)
 
 		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_ACTIVE_REGION_ADDRESS,BR_SET_IMAGE_CORRUPTED);
 		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS,Local_u32ImageSizeInBytes);
+		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_CRC_ACTIVE_REGION_ADDRESS,Local_u32CRC_Value);
 		BL_voidEraseRestoreHeaderPage(FLAG_STATUS_BOOTLOADER,BL_RESET_BRANCHING_FLAG);
 	}
 }
 
 void BL_voidReceiveUpdate(void)
 {
-	uint8_t  Local_u8DataArray[8]              					  = {BL_INITIALIZE_WITH_ZERO};
-	uint32_t Local_u32HighByteDataReceive  						  = BL_INITIALIZE_WITH_ZERO;
-	uint32_t Local_u32LowByteDataReceive  						  = BL_INITIALIZE_WITH_ZERO;
+	uint8_t  Local_u8DataArray[16]              				  = {BL_INITIALIZE_WITH_ZERO};
+	uint64_t Local_u64HighByteDataReceive  						  = BL_INITIALIZE_WITH_ZERO;
+	uint64_t Local_u64LowByteDataReceive  						  = BL_INITIALIZE_WITH_ZERO;
 	uint32_t Local_u32InactiveImageAddressCounter                 = ACTIVE_IMAGE_START_ADDRESS;
 	uint32_t Local_u32SizeOfCode 								  = BL_u32ReadAddressData(FLAG_STATUS_SIZE_ACTIVE_REGION_ADDRESS);
 	uint8_t	 Local_u8HeaderFlag                					  = BL_INITIALIZE_WITH_ZERO;
+	struct AES_ctx ctx;
+	AES_init_ctx_iv(&ctx, AES_CBC_128_Key, AES_CBC_128_IV);
 
 	FLASH_EraseInitTypeDef Local_eraseInfo;
 	uint32_t Local_u32PageError;
@@ -305,34 +337,47 @@ void BL_voidReceiveUpdate(void)
 		{
 			CAN_IF_Transmit_UDS_Request(NODE_ID_ONE, UDS_MCU_ACCEPT_RECEIVING_PACKET_OF_CODE);
 
-			if (Local_u32SizeOfCode > 8){
-				CAN_IF_Receive_Data_Frame(Local_u8DataArray);
-				Local_u32HighByteDataReceive = (Local_u8DataArray[7] << SHIFT_24_BIT) | (Local_u8DataArray[6] << SHIFT_16_BIT)
-											| (Local_u8DataArray[5] << SHIFT_8_BIT) | (Local_u8DataArray[4] << SHIFT_0_BIT) ;
-				Local_u32LowByteDataReceive  = (Local_u8DataArray[3] << SHIFT_24_BIT) | (Local_u8DataArray[2] << SHIFT_16_BIT)
-											| (Local_u8DataArray[1] << SHIFT_8_BIT) | (Local_u8DataArray[0] << SHIFT_0_BIT) ;
+			if (Local_u32SizeOfCode > SIZEOF_PACKAGE_FIRMWARE){
+				CAN_IF_Receive_Data_Buffer(Local_u8DataArray, SIZEOF_PACKAGE_FIRMWARE);
+				/*access piont to Encrypt SWC*/
+				AES_CBC_decrypt_buffer(&ctx, Local_u8DataArray, 16);
+
+				Local_u64HighByteDataReceive= ((uint64_t)Local_u8DataArray[7] << SHIFT_56_BIT) | ((uint64_t)Local_u8DataArray[6] << SHIFT_48_BIT)
+											| ((uint64_t)Local_u8DataArray[5] << SHIFT_40_BIT) | ((uint64_t)Local_u8DataArray[4] << SHIFT_32_BIT)
+											| ((uint64_t)Local_u8DataArray[3] << SHIFT_24_BIT) | ((uint64_t)Local_u8DataArray[2] << SHIFT_16_BIT)
+											| ((uint64_t)Local_u8DataArray[1] << SHIFT_8_BIT)  | ((uint64_t)Local_u8DataArray[0] << SHIFT_0_BIT);
+
+				Local_u64LowByteDataReceive = ((uint64_t)Local_u8DataArray[15] << SHIFT_56_BIT) | ((uint64_t)Local_u8DataArray[14] << SHIFT_48_BIT)
+											| ((uint64_t)Local_u8DataArray[13] << SHIFT_40_BIT)  | ((uint64_t)Local_u8DataArray[12] << SHIFT_32_BIT)
+											| ((uint64_t)Local_u8DataArray[11] << SHIFT_24_BIT) | ((uint64_t)Local_u8DataArray[10] << SHIFT_16_BIT)
+											| ((uint64_t)Local_u8DataArray[9] << SHIFT_8_BIT)  | ((uint64_t)Local_u8DataArray[8] << SHIFT_0_BIT);
 
 				HAL_FLASH_Unlock(); //Unlocks the flash memory
-				HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Local_u32InactiveImageAddressCounter, Local_u32LowByteDataReceive);
-				HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Local_u32InactiveImageAddressCounter + 4, Local_u32HighByteDataReceive);
+				HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Local_u32InactiveImageAddressCounter, Local_u64HighByteDataReceive);
+				HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Local_u32InactiveImageAddressCounter + 8, Local_u64LowByteDataReceive);
 				HAL_FLASH_Lock();  //Locks again the flash memory
 
-				Local_u32InactiveImageAddressCounter += 8;
-				Local_u32SizeOfCode -= 8;
+				Local_u32InactiveImageAddressCounter += 16;
+				Local_u32SizeOfCode -= SIZEOF_PACKAGE_FIRMWARE;
 			}
 			else{
-				CAN_IF_Receive_Data_Frame(Local_u8DataArray);
+				CAN_IF_Receive_Data_Buffer(Local_u8DataArray, SIZEOF_PACKAGE_FIRMWARE);
+				/*access piont to Encrypt SWC*/
+				AES_CBC_decrypt_buffer(&ctx, Local_u8DataArray, 16);
 
-				Local_u32HighByteDataReceive = (Local_u8DataArray[7] << SHIFT_24_BIT) | (Local_u8DataArray[6] << SHIFT_16_BIT)
-											| (Local_u8DataArray[5] << SHIFT_8_BIT) | (Local_u8DataArray[4] << SHIFT_0_BIT) ;
-				Local_u32LowByteDataReceive  = (Local_u8DataArray[3] << SHIFT_24_BIT) | (Local_u8DataArray[2] << SHIFT_16_BIT)
-											| (Local_u8DataArray[1] << SHIFT_8_BIT) | (Local_u8DataArray[0] << SHIFT_0_BIT) ;
+				Local_u64HighByteDataReceive= ((uint64_t)Local_u8DataArray[7] << SHIFT_56_BIT) | ((uint64_t)Local_u8DataArray[6] << SHIFT_48_BIT)
+											| ((uint64_t)Local_u8DataArray[5] << SHIFT_40_BIT) | ((uint64_t)Local_u8DataArray[4] << SHIFT_32_BIT)
+											| ((uint64_t)Local_u8DataArray[3] << SHIFT_24_BIT) | ((uint64_t)Local_u8DataArray[2] << SHIFT_16_BIT)
+											| ((uint64_t)Local_u8DataArray[1] << SHIFT_8_BIT)  | ((uint64_t)Local_u8DataArray[0] << SHIFT_0_BIT);
+
+				Local_u64LowByteDataReceive = ((uint64_t)Local_u8DataArray[15] << SHIFT_56_BIT) | ((uint64_t)Local_u8DataArray[14] << SHIFT_48_BIT)
+											| ((uint64_t)Local_u8DataArray[13] << SHIFT_40_BIT) | ((uint64_t)Local_u8DataArray[12] << SHIFT_32_BIT)
+											| ((uint64_t)Local_u8DataArray[11] << SHIFT_24_BIT) | ((uint64_t)Local_u8DataArray[10] << SHIFT_16_BIT)
+											| ((uint64_t)Local_u8DataArray[9] << SHIFT_8_BIT)   | ((uint64_t)Local_u8DataArray[8] << SHIFT_0_BIT);
 
 				HAL_FLASH_Unlock(); //Unlocks the flash memory
-				HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Local_u32InactiveImageAddressCounter, Local_u32LowByteDataReceive);
-				if(RxHeader.DLC > 4){
-					HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Local_u32InactiveImageAddressCounter + 4, Local_u32HighByteDataReceive);
-				}
+				HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Local_u32InactiveImageAddressCounter, Local_u64HighByteDataReceive);
+				HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, Local_u32InactiveImageAddressCounter + 8, Local_u64LowByteDataReceive);
 				HAL_FLASH_Lock();  //Locks again the flash memory
 
 				Local_u32SizeOfCode -= Local_u32SizeOfCode ;

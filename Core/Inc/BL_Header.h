@@ -15,7 +15,7 @@
 //**************************Include***************************//
 
 //*************************Define****************************//
-
+#define Debugs
 
 #define BOOTLOADER_IMAGE			(0x08000000)
 #define ACTIVE_IMAGE              	(0x08005000)      // Origin + Bootloader size (20kB)
@@ -116,16 +116,22 @@
 
 //Node ID define
 #define NODE_ID_ONE 0x10
-#define NODE_ID_TWO 0x20
+#define NODE_ID_TWO 0x11
 
 #define HEADER_DATA_LENGTH 1
 #define RECEIVE_DATA_LENGTH 8
 
 //Shift bit macro
+#define SHIFT_56_BIT	56
+#define SHIFT_48_BIT	48
+#define SHIFT_40_BIT	40
+#define SHIFT_32_BIT	32
 #define SHIFT_24_BIT	24
 #define SHIFT_16_BIT	16
 #define SHIFT_8_BIT		8
 #define SHIFT_0_BIT		0
+
+#define SIZEOF_PACKAGE_FIRMWARE 16
 //*************************Define****************************//
 
 //*************************Structure****************************//

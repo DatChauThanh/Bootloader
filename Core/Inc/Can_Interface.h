@@ -119,4 +119,29 @@ HAL_StatusTypeDef CAN_IF_Receive_UDS_Respond(uint8_t *UDS_Req);
 *******************************************************************************/
 HAL_StatusTypeDef CAN_IF_Receive_Data_Frame(uint8_t *DataBuffer);
 
+/******************************************************************************
+* Function :CAN_IF_Receive_Data_Buffer(uint8_t *DataBuffer , uint32_t Copy_DataLength);
+*//**
+* \b Description:
+*
+* This function is used to receive data from fifo0
+*
+* PRE-CONDITION:  Can Peripheral enable
+*
+* POST-CONDITION: None
+*
+* @param [in]      uint8_t* Pointer to buffer Rx with Copy_DataLength
+*
+* @return 		   HAL_StatusTypeDef
+*
+* \b Example Example:
+* @code
+* 	CAN_IF_Receive_Data_Buffer(uint8_t *DataBuffer , uint32_t Copy_DataLength);
+*
+* @endcode
+*
+* @see CAN_IF_Receive_Data_Buffer(uint8_t *DataBuffer , uint32_t Copy_DataLength);
+*
+*******************************************************************************/
+HAL_StatusTypeDef CAN_IF_Receive_Data_Buffer(uint8_t *DataBuffer , uint32_t Copy_DataLength);
 #endif /* INC_CAN_INTERFACE_H_ */

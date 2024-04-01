@@ -1,4 +1,6 @@
-../Core/Src/Can_Interface.c:9:19:CAN_IF_Transmit_UDS_Request	3
-../Core/Src/Can_Interface.c:31:19:CAN_IF_Trasmit_Data_Frame	4
-../Core/Src/Can_Interface.c:55:19:CAN_IF_Receive_UDS_Respond	2
-../Core/Src/Can_Interface.c:64:19:CAN_IF_Receive_Data_Frame	3
+../Core/Src/Can_Interface.c:10:19:CAN_IF_Transmit_UDS_Request	3
+../Core/Src/Can_Interface.c:32:19:CAN_IF_Trasmit_Data_Frame	4
+../Core/Src/Can_Interface.c:57:19:CAN_IF_Trasmit_Data_Buffer	5
+../Core/Src/Can_Interface.c:91:19:CAN_IF_Receive_UDS_Respond	2
+../Core/Src/Can_Interface.c:100:19:CAN_IF_Receive_Data_Frame	3
+../Core/Src/Can_Interface.c:112:19:CAN_IF_Receive_Data_Buffer	5

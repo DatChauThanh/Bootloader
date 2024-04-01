@@ -41,6 +41,7 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+extern CRC_HandleTypeDef hcrc;
 extern CAN_HandleTypeDef hcan;
 extern IWDG_HandleTypeDef hiwdg;
 extern CAN_TxHeaderTypeDef TxHeader;
